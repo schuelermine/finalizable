@@ -15,6 +15,14 @@ pub enum Finalizable<T> {
 }
 
 impl<T> Finalizable<T> {
+    /// Create a new finalizable value from a value and a boolean
+    /// that determines if it is a finalized or working value.
+    pub fn new(value: T, finalized: bool) -> Self {
+        match finalized {
+            true => Finalized(value),
+            false => Working(value),
+        }
+    }
     /// Finalize a value. Returns a finalized version of the value.
     pub fn finalize(self) -> Self {
         Finalized(self.get())
@@ -30,6 +38,14 @@ impl<T> Finalizable<T> {
     /// whether working or finalized, as a reference to the underlying value.
     pub fn get_as_ref(&self) -> &T {
         self.as_ref().get()
+    }
+    /// Get the value from a mutable reference to a working value
+    /// as a mutable reference. Returns [`None`] if the value is a finalized value.
+    pub fn try_get_mut(&mut self) -> Option<&mut T> {
+        match self {
+            Working(x) => Some(x),
+            Finalized(_) => None,
+        }
     }
     /// Override a working value. Does nothing to a finalized value.
     pub fn set(self, value: T) -> Self {
