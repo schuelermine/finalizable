@@ -1,113 +1,116 @@
 #![no_std]
 
-use core::iter::{once, FusedIterator, Once};
-use Finalizable::*;
+pub use Finalizable::*;
 
-pub use Finalizable::Working;
-
+/// A value that can be a working value or a finalized value.
+/// All operations on a single [`Finalizable<T>`] do not modify a finalized value.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Finalizable<T> {
+    /// A working value.
     Working(T),
+    /// A finalized value.
     Finalized(T),
 }
 
 impl<T> Finalizable<T> {
-    pub fn finalized(self) -> Self {
+    /// Finalize a value. Returns a finalized version of the value.
+    pub fn finalize(self) -> Self {
         Finalized(self.get())
     }
-    pub fn and_then_finalized<F: FnOnce(T) -> T>(self, op: F) -> Self {
-        self.map(op).finalized()
-    }
+    /// Get the value, whether working or finalized.
     pub fn get(self) -> T {
         match self {
             Working(x) => x,
             Finalized(x) => x,
         }
     }
+    /// Get the value from a reference to a finalizable value,
+    /// whether working or finalized, as a reference to the contained value.
     pub fn get_as_ref(&self) -> &T {
         self.as_ref().get()
     }
-    pub fn get_as_mut(&mut self) -> &mut T {
-        self.as_mut().get()
-    }
+    /// Override a working value. Does nothing to a finalized value.
     pub fn set(self, value: T) -> Self {
         match self {
             Working(_) => Working(value),
             a @ Finalized(_) => a,
         }
     }
+    /// Check if a value is a working value.
     pub fn is_working(&self) -> bool {
         matches!(self, Working(_))
     }
+    /// Check if a value is a finalized value.
     pub fn is_finalized(&self) -> bool {
         matches!(self, Finalized(_))
     }
+    /// Get the value, but only if it is a working value.
+    /// Returns [`None`] if the value is a finalized value.
     pub fn working_or_none(self) -> Option<T> {
         match self {
             Working(x) => Some(x),
             Finalized(_) => None,
         }
     }
+    /// Get the value, but only if it is a finalized value.
+    /// Returns [`None`] if the value is a working value.
     pub fn finalized_or_none(self) -> Option<T> {
         match self {
             Working(_) => None,
             Finalized(x) => Some(x),
         }
     }
+    /// Get the value, but only if it is a finalized value.
+    /// Returns `default` if the value is a working value.
     pub fn finalized_or(self, default: T) -> T {
         match self {
             Working(_) => default,
             Finalized(x) => x,
         }
     }
+    /// Get the value, but only if it is a finalized value.
+    /// Calls `default` and returns its result if the value is a working value.
     pub fn finalized_or_else<F: FnOnce(T) -> T>(self, op: F) -> T {
         match self {
             Working(x) => op(x),
             Finalized(x) => x,
         }
     }
+    /// Turn a reference to a finalizable value into a finalizable reference.
     pub fn as_ref(&self) -> Finalizable<&T> {
         match self {
             Working(x) => Working(x),
             Finalized(x) => Finalized(x),
         }
     }
-    pub fn as_mut(&mut self) -> Finalizable<&mut T> {
-        match self {
-            Working(x) => Working(x),
-            Finalized(x) => Finalized(x),
-        }
-    }
+    /// Apply a function to a working value. Does nothing to a finalized value.
     pub fn map<F: FnOnce(T) -> T>(self, op: F) -> Self {
         match self {
             Working(x) => Working(op(x)),
             a @ Finalized(_) => a,
         }
     }
-    pub fn iter(&self) -> Iter<'_, T> {
-        match self {
-            Working(x) => Iter { inner: once(x) },
-            Finalized(x) => Iter { inner: once(x) },
-        }
+    /// Apply a function to a working value and finalize it.
+    /// Does nothing to a finalized value.
+    pub fn map_and_finalize<F: FnOnce(T) -> T>(self, op: F) -> Self {
+        self.map(op).finalize()
     }
-    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
-        match self {
-            Working(x) => IterMut { inner: once(x) },
-            Finalized(x) => IterMut { inner: once(x) },
-        }
-    }
+    /// Get a finalized value, panicking with `msg` if the value is a working value.
     pub fn expect_finalized(self, msg: &str) -> T {
         match self {
             Working(x) => x,
             Finalized(_) => panic!("{}", msg),
         }
     }
+    /// Return `fin` if the value is a working value, returning a finalized value unchanged.
     pub fn and(self, fin: Self) -> Self {
         match self {
             Working(_) => fin,
             a @ Finalized(_) => a,
         }
     }
+    /// Call `op` on the value if it is a working value,
+    /// returning a finalized value unchanged.
     pub fn and_then<F: FnOnce(T) -> Self>(self, op: F) -> Self {
         match self {
             Working(x) => op(x),
@@ -117,6 +120,7 @@ impl<T> Finalizable<T> {
 }
 
 impl<T> Finalizable<&T> {
+    /// Make a copy of a finalizable value by copying the underlying value.
     pub fn copied(self) -> Finalizable<T>
     where
         T: Copy,
@@ -126,7 +130,7 @@ impl<T> Finalizable<&T> {
             Finalized(x) => Finalized(*x),
         }
     }
-
+    /// Make a clone of a finalizable value by cloning the underlying value.
     pub fn cloned(self) -> Finalizable<T>
     where
         T: Clone,
@@ -137,104 +141,3 @@ impl<T> Finalizable<&T> {
         }
     }
 }
-
-impl<'a, T> IntoIterator for &'a Finalizable<T> {
-    type IntoIter = Iter<'a, T>;
-    type Item = &'a T;
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
-    }
-}
-
-impl<'a, T> IntoIterator for &'a mut Finalizable<T> {
-    type IntoIter = IterMut<'a, T>;
-    type Item = &'a mut T;
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter_mut()
-    }
-}
-
-impl<'a, T> IntoIterator for Finalizable<T> {
-    type IntoIter = IntoIter<T>;
-    type Item = T;
-    fn into_iter(self) -> Self::IntoIter {
-        IntoIter {
-            inner: once(self.get()),
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Iter<'a, T> {
-    inner: Once<&'a T>,
-}
-
-impl<'a, T> Iterator for Iter<'a, T> {
-    type Item = &'a T;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
-    }
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
-    }
-}
-
-impl<'a, T> DoubleEndedIterator for Iter<'a, T> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        self.inner.next_back()
-    }
-}
-
-impl<'a, T> ExactSizeIterator for Iter<'a, T> {}
-
-impl<'a, T> FusedIterator for Iter<'a, T> {}
-
-#[derive(Debug)]
-pub struct IterMut<'a, T> {
-    inner: Once<&'a mut T>,
-}
-
-impl<'a, T> Iterator for IterMut<'a, T> {
-    type Item = &'a mut T;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
-    }
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
-    }
-}
-
-impl<'a, T> DoubleEndedIterator for IterMut<'a, T> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        self.inner.next_back()
-    }
-}
-
-impl<'a, T> ExactSizeIterator for IterMut<'a, T> {}
-
-impl<'a, T> FusedIterator for IterMut<'a, T> {}
-
-#[derive(Clone, Debug)]
-pub struct IntoIter<T> {
-    inner: Once<T>,
-}
-
-impl<T> Iterator for IntoIter<T> {
-    type Item = T;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
-    }
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
-    }
-}
-
-impl<T> DoubleEndedIterator for IntoIter<T> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        self.inner.next_back()
-    }
-}
-
-impl<T> ExactSizeIterator for IntoIter<T> {}
-
-impl<T> FusedIterator for IntoIter<T> {}
