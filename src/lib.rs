@@ -3,6 +3,8 @@
 use core::iter::{once, FusedIterator, Once};
 use Finalizable::*;
 
+pub use Finalizable::Working;
+
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Finalizable<T> {
     Working(T),
