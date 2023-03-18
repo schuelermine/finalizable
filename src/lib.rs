@@ -135,6 +135,17 @@ impl<T> Finalizable<T> {
             a @ Finalized(_) => a,
         }
     }
+    /// Call `op` on the value if it is a working value,
+    /// creating a new finalizable value by using the returned tuple
+    /// as the arguments to [`new`], returning a finalized value unchanged.
+    ///
+    /// [`new`]: Finalizable::new
+    pub fn and_then_new<F: FnOnce(T) -> (T, bool)>(self, op: F) -> Self {
+        self.and_then(|x| {
+            let (value, finalized) = op(x);
+            Finalizable::new(value, finalized)
+        })
+    }
 }
 
 impl<T> Finalizable<&T> {
