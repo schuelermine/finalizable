@@ -2,3 +2,9 @@
 name = "finalizable"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+readme = "README.md"
+description = "A type for finalizable values"
+repository = "https://github.com/schuelermine/finalizable"
+keywords = ["no-std"]
+categories = ["no-std", "no-std::no-alloc"]
