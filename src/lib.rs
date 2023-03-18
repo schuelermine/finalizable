@@ -27,7 +27,7 @@ impl<T> Finalizable<T> {
         }
     }
     /// Get the value from a reference to a finalizable value,
-    /// whether working or finalized, as a reference to the contained value.
+    /// whether working or finalized, as a reference to the underlying value.
     pub fn get_as_ref(&self) -> &T {
         self.as_ref().get()
     }
