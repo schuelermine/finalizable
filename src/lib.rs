@@ -1,6 +1,10 @@
 #![no_std]
+#![cfg_attr(feature = "try", feature(try_trait_v2))]
 //! This crate provides a type ([`Finalizable`]) for values that can be finalized,
 //! with methods that operate on working values but leave finalized values unchanged.
+
+#[cfg(feature = "try")]
+use core::ops::{ControlFlow, FromResidual, Try};
 
 pub use Finalizable::*;
 
@@ -170,3 +174,33 @@ impl<T> Finalizable<&T> {
         }
     }
 }
+
+#[cfg(feature = "try")]
+/// Acts like [`ControlFlow<T, T>`].
+/// Finalized values ([`Finalized`]) break,
+/// working values ([`Working`]) continue.
+impl<T> Try for Finalizable<T> {
+    type Output = T;
+    type Residual = Residual<T>;
+    fn branch(self) -> ControlFlow<Self::Residual, Self::Output> {
+        match self {
+            Working(x) => ControlFlow::Continue(x),
+            Finalized(x) => ControlFlow::Break(Residual(x)),
+        }
+    }
+    fn from_output(output: Self::Output) -> Self {
+        Working(output)
+    }
+}
+
+#[cfg(feature = "try")]
+impl<T> FromResidual for Finalizable<T> {
+    fn from_residual(residual: <Self as Try>::Residual) -> Self {
+        Finalized(residual.0)
+    }
+}
+
+#[cfg(feature = "try")]
+/// The residual from applying `?` to a finalized value ([`Finalized`]).
+/// Used in the implementation of [`Try`] for [`Finalizable`].
+pub struct Residual<T>(pub T);
